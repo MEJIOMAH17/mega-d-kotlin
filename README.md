@@ -1,2 +1,4 @@
 # mega-d-kotlin
-Kotlin DSL for megad-2561
+Kotlin Api for megad-2561
+
+See MegaDClient for details
