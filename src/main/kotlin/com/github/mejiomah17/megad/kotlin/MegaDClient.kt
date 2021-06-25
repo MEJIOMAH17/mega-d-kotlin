@@ -1,18 +1,19 @@
 package com.github.mejiomah17.megad.kotlin
 
+import com.github.mejiomah17.megad.kotlin.pwm.Pwm
+import com.github.mejiomah17.megad.kotlin.pwm.PwmLevel
 import com.github.mejiomah17.megad.kotlin.relay.Relay
 import com.github.mejiomah17.megad.kotlin.relay.RelayCommand
 import com.github.mejiomah17.megad.kotlin.relay.RelayStatus
-import io.ktor.client.*
-import io.ktor.client.call.*
-import io.ktor.client.features.*
-import io.ktor.client.request.*
-import io.ktor.client.statement.*
-import io.ktor.http.*
-import io.ktor.utils.io.*
-import okhttp3.OkHttpClient
-import org.jsoup.Jsoup
+import io.ktor.client.HttpClient
+import io.ktor.client.call.receive
+import io.ktor.client.features.get
+import io.ktor.client.request.get
+import io.ktor.client.request.host
+import io.ktor.client.request.request
+import io.ktor.client.statement.HttpResponse
 import java.net.URLEncoder
+import org.jsoup.Jsoup
 
 /**
  * Use host and password to specify prefix path for client
@@ -32,6 +33,32 @@ class MegaDClient(
      */
     private val password: String,
 ) {
+
+    /**
+     * PWD - ШИМ
+     */
+    suspend fun configureAsPwd(deviceNumber: Int) {
+        getRawPage("pn=$deviceNumber&pty=1&d=0&m=1&grp=")
+    }
+
+    /**
+     * SW - ordinal relay
+     */
+    suspend fun configureAsSW(deviceNumber: Int) {
+        getRawPage("pn=$deviceNumber&pty=1&d=0&m=0&pwmm=0&grp=&fr=0")
+    }
+
+    suspend fun getPwmLevel(pwm: Pwm): PwmLevel {
+        return parsePwmLevel(
+            html = getRawPage("pt=${pwm.number}")
+        )
+    }
+
+    suspend fun setPwmLevel(pwm: Pwm, level: PwmLevel): PwmLevel {
+        return parsePwmLevel(
+            html = getRawPage("pt=${pwm.number}&pwm=${level.value}")
+        )
+    }
 
     suspend fun getRelayStatus(relay: Relay): RelayStatus {
         return parseRelayStatus(
@@ -58,5 +85,13 @@ class MegaDClient(
         val rawText = Jsoup.parse(html).body().ownText()
         val rawStatus = rawText.takeLastWhile { it != '/' }
         return RelayStatus.valueOf(rawStatus)
+    }
+
+    private fun parsePwmLevel(html: String): PwmLevel {
+        val level = Jsoup.parse(html).body().allElements.first {
+            it.attr("name")?.trim()?.lowercase() == "pwm"
+        }.attr("value") ?: error("can't find pwm level")
+
+        return PwmLevel(level.toInt())
     }
 }

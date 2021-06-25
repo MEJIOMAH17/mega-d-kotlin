@@ -1,5 +1,7 @@
 package com.github.mejiomah17.megad.kotlin
 
+import com.github.mejiomah17.megad.kotlin.pwm.Pwm
+import com.github.mejiomah17.megad.kotlin.pwm.PwmLevel
 import com.github.mejiomah17.megad.kotlin.relay.Relay
 import com.github.mejiomah17.megad.kotlin.relay.RelayCommand
 import com.github.mejiomah17.megad.kotlin.relay.RelayStatus
@@ -32,5 +34,13 @@ class MegaDClientTest {
 
         client.executeCommand(Relay(7), RelayCommand.SWITCH) shouldBe RelayStatus.ON
         client.getRelayStatus(Relay(7))  shouldBe RelayStatus.ON
+    }
+
+    @Test
+    fun `should use led`():Unit = runBlocking {
+        for (i in 0..255 step 20){
+            client.setPwmLevel(Pwm(12), PwmLevel(i)) shouldBe PwmLevel(i)
+        }
+
     }
 }
