@@ -5,6 +5,11 @@ import com.github.mejiomah17.megad.kotlin.pwm.PwmLevel
 import com.github.mejiomah17.megad.kotlin.relay.Relay
 import com.github.mejiomah17.megad.kotlin.relay.RelayCommand
 import com.github.mejiomah17.megad.kotlin.relay.RelayStatus
+import com.github.mejiomah17.megad.kotlin.sensor.wall.mount.Htu21d
+import com.github.mejiomah17.megad.kotlin.sensor.wall.mount.Max44009
+import com.github.mejiomah17.megad.kotlin.sensor.wall.mount.T67xx
+import com.github.mejiomah17.megad.kotlin.sensor.wall.mount.WallMountSensor
+import com.github.mejiomah17.megad.kotlin.sensor.wall.mount.Wallmount
 import io.ktor.client.HttpClient
 import io.ktor.client.call.receive
 import io.ktor.client.features.get
@@ -13,6 +18,7 @@ import io.ktor.client.request.host
 import io.ktor.client.request.request
 import io.ktor.client.statement.HttpResponse
 import java.net.URLEncoder
+import kotlinx.coroutines.delay
 import org.jsoup.Jsoup
 
 /**
@@ -48,6 +54,32 @@ class MegaDClient(
         getRawPage("pn=$deviceNumber&pty=1&d=0&m=0&pwmm=0&grp=&fr=0")
     }
 
+    suspend fun configureAsWallmount(sdaPortNumber: Int, slcPortNumber: Int) {
+        getRawPage("pn=$slcPortNumber&pty=4&m=2")
+        getRawPage("pn=$slcPortNumber&pty=4&m=2")
+        getRawPage("pn=$sdaPortNumber&pty=4&m=1&misc=35&gr=0&d=0")
+        getRawPage("pn=$sdaPortNumber&pty=4&m=1&misc=35&gr=0&d=0")
+    }
+
+    suspend fun getTemperature(wallmount: Wallmount): Double {
+        return getWallmountPage(wallmount, Htu21d.Temperature).toDouble()
+    }
+
+    /**
+     * percent 0-100
+     */
+    suspend fun getHumidity(wallmount: Wallmount): Double {
+        return getWallmountPage(wallmount, Htu21d.Humidity).toDouble()
+    }
+
+    suspend fun getLightLevel(wallmount: Wallmount): Double {
+        return getWallmountPage(wallmount, Max44009).toDouble()
+    }
+
+    suspend fun getCO2Level(wallmount: Wallmount): Int {
+        return getWallmountPage(wallmount, T67xx).toInt()
+    }
+
     suspend fun getPwmLevel(pwm: Pwm): PwmLevel {
         return parsePwmLevel(
             html = getRawPage("pt=${pwm.number}")
@@ -79,6 +111,19 @@ class MegaDClient(
             this.url.encodedPath = "$password/?$path"
         }
         return response.receive()
+    }
+
+    private suspend fun getWallmountPage(wallmount: Wallmount, sensor: WallMountSensor): String {
+        val path =
+            "pt=${wallmount.sdaPortNumber}&scl=${wallmount.slcPortNumber}&i2c_dev=${sensor.i2cDev}&i2c_par=${sensor.i2cPair}"
+        var counter = 5
+        var result =  getRawPage(path)
+        while (result.trim().uppercase() == "NA" && counter > 0){
+            counter--
+            delay(200)
+            result = getRawPage(path)
+        }
+        return result
     }
 
     private fun parseRelayStatus(html: String): RelayStatus {
