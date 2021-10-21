@@ -1,5 +1,7 @@
 package com.github.mejiomah17.megad.kotlin
 
+import com.github.mejiomah17.megad.kotlin.executor.MegaD16PWM
+import com.github.mejiomah17.megad.kotlin.executor.MegaD16RXT
 import com.github.mejiomah17.megad.kotlin.pwm.Pwm
 import com.github.mejiomah17.megad.kotlin.pwm.PwmLevel
 import com.github.mejiomah17.megad.kotlin.relay.Relay
@@ -54,11 +56,57 @@ class MegaDClient(
         getRawPage("pn=$deviceNumber&pty=1&d=0&m=0&pwmm=0&grp=&fr=0")
     }
 
+    suspend fun configureAsSLC(slcPortNumber: Int){
+        getRawPage("pn=$slcPortNumber&pty=4&m=2")
+    }
     suspend fun configureAsWallmount(sdaPortNumber: Int, slcPortNumber: Int) {
-        getRawPage("pn=$slcPortNumber&pty=4&m=2")
-        getRawPage("pn=$slcPortNumber&pty=4&m=2")
-        getRawPage("pn=$sdaPortNumber&pty=4&m=1&misc=35&gr=0&d=0")
-        getRawPage("pn=$sdaPortNumber&pty=4&m=1&misc=35&gr=0&d=0")
+        configureAsSLC(slcPortNumber)
+        configureI2C(sdaPortNumber = sdaPortNumber,slcPortNumber=slcPortNumber,suffix ="gr=0&d=0" )
+    }
+
+    /**
+     * 16 relay executor module
+     */
+    suspend fun configureAs16RXT(sdaPortNumber: Int, slcPortNumber: Int) {
+        configureAsSLC(slcPortNumber)
+        configureI2C(sdaPortNumber = sdaPortNumber,slcPortNumber=slcPortNumber,suffix ="gr=3&d=20&inta=" )
+        for (port in 0..15){
+            getRawPage("pt=$sdaPortNumber&ext=$port&ety=1&eact=&emode=0")
+        }
+    }
+
+    /**
+     * 16 PWM executor module
+     */
+    suspend fun configureAs16PWM(sdaPortNumber: Int, slcPortNumber: Int) {
+        configureAsSLC(slcPortNumber)
+        configureI2C(sdaPortNumber = sdaPortNumber,slcPortNumber=slcPortNumber,suffix ="gr=3&d=21&hst=200" )
+    }
+
+
+    suspend fun getRelayStatus(megaD16RXT: MegaD16RXT,relay: Relay): RelayStatus {
+        return parseRelayStatus(
+            html = getRawPage("pt=${megaD16RXT.sdaPortNumber}&ext=${relay.number}")
+        )
+    }
+
+    suspend fun getPwmLevel(megaD16PWM: MegaD16PWM,pwm: Pwm): PwmLevel {
+        return parsePwmLevel(
+            html = getRawPage("pt=${megaD16PWM.sdaPortNumber}&ext=${pwm.number}")
+        )
+    }
+
+    suspend fun setPwmLevel(megaD16PWM: MegaD16PWM,pwm: Pwm, level: PwmLevel): PwmLevel {
+        return parsePwmLevel(
+            html = getRawPage("pt=${megaD16PWM.sdaPortNumber}&ext=${pwm.number}&epwm=${level.value}")
+        )
+    }
+
+    suspend fun executeCommand(megaD16RXT: MegaD16RXT, relay: Relay, command: RelayCommand): RelayStatus {
+        val sdaPortNumber = megaD16RXT.sdaPortNumber
+        return parseRelayStatus(
+            html = getRawPage("pt=$sdaPortNumber&ext=${relay.number}&cmd=${sdaPortNumber}e${relay.number}:${command.intValue}")
+        )
     }
 
     suspend fun getTemperature(wallmount: Wallmount): Double {
@@ -105,12 +153,16 @@ class MegaDClient(
     }
 
     suspend fun getRawPage(path: String): String {
-        val url = URLEncoder.encode("http://$host/$password/?$path", "UTF-8");
         val response: HttpResponse = httpClient.request {
             host = this@MegaDClient.host
-            this.url.encodedPath = "$password/?$path"
+            url.encodedPath = "$password/?$path"
         }
         return response.receive()
+    }
+
+    private suspend fun configureI2C(sdaPortNumber: Int,slcPortNumber: Int, suffix:String){
+        getRawPage("pn=$sdaPortNumber&pty=4&m=1&misc=$slcPortNumber&$suffix")
+        getRawPage("pn=$sdaPortNumber&pty=4&m=1&misc=$slcPortNumber&$suffix")
     }
 
     private suspend fun getWallmountPage(wallmount: Wallmount, sensor: WallMountSensor): String {
@@ -134,7 +186,7 @@ class MegaDClient(
 
     private fun parsePwmLevel(html: String): PwmLevel {
         val level = Jsoup.parse(html).body().allElements.first {
-            it.attr("name")?.trim()?.lowercase() == "pwm"
+            it.attr("name")?.trim()?.lowercase()?.contains("pwm") ?: false
         }.attr("value") ?: error("can't find pwm level")
 
         return PwmLevel(level.toInt())

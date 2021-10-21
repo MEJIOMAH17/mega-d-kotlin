@@ -1,5 +1,7 @@
 package com.github.mejiomah17.megad.kotlin
 
+import com.github.mejiomah17.megad.kotlin.executor.MegaD16PWM
+import com.github.mejiomah17.megad.kotlin.executor.MegaD16RXT
 import com.github.mejiomah17.megad.kotlin.pwm.Pwm
 import com.github.mejiomah17.megad.kotlin.pwm.PwmLevel
 import com.github.mejiomah17.megad.kotlin.relay.Relay
@@ -54,5 +56,26 @@ class MegaDClientTest {
         client.getHumidity(wallmount)
         client.getCO2Level(wallmount)
         client.getLightLevel(wallmount)
+    }
+
+    @Test
+    fun `can use 16RXT`(): Unit = runBlocking {
+        client.configureAs16RXT(42,43)
+        val megaD16RXT = MegaD16RXT(sdaPortNumber = 42)
+        val relay = Relay(12)
+        client.executeCommand(megaD16RXT,relay,RelayCommand.OFF)
+        client.getRelayStatus(megaD16RXT, relay) shouldBe RelayStatus.OFF
+        client.executeCommand(megaD16RXT,relay,RelayCommand.ON)
+        client.getRelayStatus(megaD16RXT, relay) shouldBe RelayStatus.ON
+    }
+
+    @Test
+    fun `can use 16PWM`(): Unit = runBlocking {
+        client.configureAs16PWM(41,43)
+        val pwm = MegaD16PWM(41)
+        for (i in 0..255 step 1) {
+            client.setPwmLevel(pwm,Pwm(12), PwmLevel(i)) shouldBe PwmLevel(i)
+            Thread.sleep(50)
+        }
     }
 }
