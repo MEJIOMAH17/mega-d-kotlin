@@ -7,10 +7,10 @@ repositories {
 }
 
 dependencies {
-    implementation("io.ktor:ktor-client-core:1.6.0")
-    implementation("io.ktor:ktor-client-okhttp:1.6.0")
-    implementation("io.ktor:ktor-client-cio:1.6.0")
-    implementation("io.ktor:ktor-client-java:1.6.0")
+    implementation("io.ktor:ktor-client-core:1.6.3")
+    implementation("io.ktor:ktor-client-okhttp:1.6.3")
+    implementation("io.ktor:ktor-client-cio:1.6.3")
+    implementation("io.ktor:ktor-client-java:1.6.3")
     implementation("com.squareup.okhttp3:logging-interceptor:4.9.0")
     implementation("org.jetbrains.kotlin:kotlin-stdlib:1.5.10")
     implementation("org.jsoup:jsoup:1.13.1")
