@@ -7,6 +7,8 @@ import com.github.mejiomah17.megad.kotlin.pwm.PwmLevel
 import com.github.mejiomah17.megad.kotlin.relay.Relay
 import com.github.mejiomah17.megad.kotlin.relay.RelayCommand
 import com.github.mejiomah17.megad.kotlin.relay.RelayStatus
+import com.github.mejiomah17.megad.kotlin.sensor.BinarySensor
+import com.github.mejiomah17.megad.kotlin.sensor.BinarySensorState
 import com.github.mejiomah17.megad.kotlin.sensor.wall.mount.Htu21d
 import com.github.mejiomah17.megad.kotlin.sensor.wall.mount.Max44009
 import com.github.mejiomah17.megad.kotlin.sensor.wall.mount.T67xx
@@ -56,21 +58,22 @@ class MegaDClient(
         getRawPage("pn=$deviceNumber&pty=1&d=0&m=0&pwmm=0&grp=&fr=0")
     }
 
-    suspend fun configureAsSLC(slcPortNumber: Int){
+    suspend fun configureAsSLC(slcPortNumber: Byte) {
         getRawPage("pn=$slcPortNumber&pty=4&m=2")
     }
-    suspend fun configureAsWallmount(sdaPortNumber: Int, slcPortNumber: Int) {
+
+    suspend fun configureAsWallmount(sdaPortNumber: Byte, slcPortNumber: Byte) {
         configureAsSLC(slcPortNumber)
-        configureI2C(sdaPortNumber = sdaPortNumber,slcPortNumber=slcPortNumber,suffix ="gr=0&d=0" )
+        configureI2C(sdaPortNumber = sdaPortNumber, slcPortNumber = slcPortNumber, suffix = "gr=0&d=0")
     }
 
     /**
      * 16 relay executor module
      */
-    suspend fun configureAs16RXT(sdaPortNumber: Int, slcPortNumber: Int) {
+    suspend fun configureAs16RXT(sdaPortNumber: Byte, slcPortNumber: Byte) {
         configureAsSLC(slcPortNumber)
-        configureI2C(sdaPortNumber = sdaPortNumber,slcPortNumber=slcPortNumber,suffix ="gr=3&d=20&inta=" )
-        for (port in 0..15){
+        configureI2C(sdaPortNumber = sdaPortNumber, slcPortNumber = slcPortNumber, suffix = "gr=3&d=20&inta=")
+        for (port in 0..15) {
             getRawPage("pt=$sdaPortNumber&ext=$port&ety=1&eact=&emode=0")
         }
     }
@@ -78,25 +81,32 @@ class MegaDClient(
     /**
      * 16 PWM executor module
      */
-    suspend fun configureAs16PWM(sdaPortNumber: Int, slcPortNumber: Int) {
+    suspend fun configureAs16PWM(sdaPortNumber: Byte, slcPortNumber: Byte) {
         configureAsSLC(slcPortNumber)
-        configureI2C(sdaPortNumber = sdaPortNumber,slcPortNumber=slcPortNumber,suffix ="gr=3&d=21&emt=" )
+        configureI2C(sdaPortNumber = sdaPortNumber, slcPortNumber = slcPortNumber, suffix = "gr=3&d=21&emt=")
     }
 
+    suspend fun configureAsBinarySensor(portNumber: Byte) {
+        getRawPage("pn=$portNumber&pty=0&ecmd=&eth=&m=0&emt=")
+    }
 
-    suspend fun getRelayStatus(megaD16RXT: MegaD16RXT,relay: Relay): RelayStatus {
+    suspend fun getBinarySensorStatus(sensor: BinarySensor): BinarySensorState {
+        return parseSensorStatus(getRawPage("pt=${sensor.port}"))
+    }
+
+    suspend fun getRelayStatus(megaD16RXT: MegaD16RXT, relay: Relay): RelayStatus {
         return parseRelayStatus(
             html = getRawPage("pt=${megaD16RXT.sdaPortNumber}&ext=${relay.number}")
         )
     }
 
-    suspend fun getPwmLevel(megaD16PWM: MegaD16PWM,pwm: Pwm): PwmLevel {
+    suspend fun getPwmLevel(megaD16PWM: MegaD16PWM, pwm: Pwm): PwmLevel {
         return parsePwmLevel(
             html = getRawPage("pt=${megaD16PWM.sdaPortNumber}&ext=${pwm.number}")
         )
     }
 
-    suspend fun setPwmLevel(megaD16PWM: MegaD16PWM,pwm: Pwm, level: PwmLevel): PwmLevel {
+    suspend fun setPwmLevel(megaD16PWM: MegaD16PWM, pwm: Pwm, level: PwmLevel): PwmLevel {
         return parsePwmLevel(
             html = getRawPage("pt=${megaD16PWM.sdaPortNumber}&ext=${pwm.number}&epwm=${level.value}")
         )
@@ -160,7 +170,7 @@ class MegaDClient(
         return response.receive()
     }
 
-    private suspend fun configureI2C(sdaPortNumber: Int,slcPortNumber: Int, suffix:String){
+    private suspend fun configureI2C(sdaPortNumber: Byte, slcPortNumber: Byte, suffix: String) {
         getRawPage("pn=$sdaPortNumber&pty=4&m=1&misc=$slcPortNumber&$suffix")
         getRawPage("pn=$sdaPortNumber&pty=4&m=1&misc=$slcPortNumber&$suffix")
     }
@@ -169,8 +179,8 @@ class MegaDClient(
         val path =
             "pt=${wallmount.sdaPortNumber}&scl=${wallmount.slcPortNumber}&i2c_dev=${sensor.i2cDev}&i2c_par=${sensor.i2cPair}"
         var counter = 5
-        var result =  getRawPage(path)
-        while (result.trim().uppercase() == "NA" && counter > 0){
+        var result = getRawPage(path)
+        while (result.trim().uppercase() == "NA" && counter > 0) {
             counter--
             delay(200)
             result = getRawPage(path)
@@ -182,6 +192,12 @@ class MegaDClient(
         val rawText = Jsoup.parse(html).body().ownText()
         val rawStatus = rawText.takeLastWhile { it != '/' }
         return RelayStatus.valueOf(rawStatus)
+    }
+
+    private fun parseSensorStatus(html: String): BinarySensorState {
+        val rawText = Jsoup.parse(html).body().ownText()
+        val rawStatus = rawText.substringAfter("/").substringBefore("/")
+        return BinarySensorState.valueOf(rawStatus)
     }
 
     private fun parsePwmLevel(html: String): PwmLevel {
