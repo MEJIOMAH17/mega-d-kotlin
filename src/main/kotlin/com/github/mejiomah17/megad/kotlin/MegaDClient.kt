@@ -80,7 +80,7 @@ class MegaDClient(
      */
     suspend fun configureAs16PWM(sdaPortNumber: Int, slcPortNumber: Int) {
         configureAsSLC(slcPortNumber)
-        configureI2C(sdaPortNumber = sdaPortNumber,slcPortNumber=slcPortNumber,suffix ="gr=3&d=21&hst=200" )
+        configureI2C(sdaPortNumber = sdaPortNumber,slcPortNumber=slcPortNumber,suffix ="gr=3&d=21&emt=" )
     }
 
 
