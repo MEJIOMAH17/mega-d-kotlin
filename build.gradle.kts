@@ -26,16 +26,20 @@ dependencies {
 tasks.withType<Test> {
     useJUnitPlatform()
 }
-
+val sourceJar = tasks.create<Jar>("sourceJar") {
+    archiveClassifier.set("sources")
+    from(sourceSets.main.get().allSource)
+}
 publishing{
     publications {
         create<MavenPublication>("test"){
             from(components["kotlin"])
+            artifact(sourceJar)
         }
     }
 }
 
 
 group = "com.github.mejiomah17"
-version = "0.1"
+version = "0.1.0"
 description = "mega-d-kotlin"

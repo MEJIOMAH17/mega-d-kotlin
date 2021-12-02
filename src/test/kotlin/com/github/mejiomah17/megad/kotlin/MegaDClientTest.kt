@@ -74,7 +74,7 @@ class MegaDClientTest {
         client.configureAs16PWM(41,43)
         val pwm = MegaD16PWM(41)
         for (i in 0..255 step 1) {
-            client.setPwmLevel(pwm,Pwm(12), PwmLevel(i)) shouldBe PwmLevel(i)
+            client.setPwmLevel(pwm,Pwm(0), PwmLevel(i)) shouldBe PwmLevel(i)
             Thread.sleep(50)
         }
     }
